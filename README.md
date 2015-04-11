@@ -6,7 +6,7 @@ Copyright (C) 2013,2014,2015 by morecat_lab
 
 2015/04/11
    
-http://morecatlab.akiba.coocan.jp/  
+http://morecatlab.akiba.coocan.jp/lab/index.php/aruino/midi-firmware-for-arduino-uno-moco/?lang=en
   
 based on LUFA-100807  
 
