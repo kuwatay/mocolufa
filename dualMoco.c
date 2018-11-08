@@ -161,7 +161,7 @@ uchar parseSerialMidiMessage(uchar RxByte) {
     14 | 0x80,			/* 15->14 */
     16 | 0x80,      /* 16->16 System Common: MTC Quarter frame, Song select, Tune request (2) */
     0,                 /* dummy */
-    19,				/* 18-> 19 System Common: Son position pointer (3) */
+    19,				/* 18-> 19 System Common: Song position pointer (3) */
     18 | 0x80			/* 19->18 */
   };
 
@@ -174,7 +174,7 @@ uchar parseSerialMidiMessage(uchar RxByte) {
       return TRUE;		/* send sysEx */
     } else {
       utx_buf[sysExCnt++] = RxByte;
-      if (sysExCnt == (TX_SIZE-1)) {	/* buffer full */
+      if (sysExCnt == 4) {	/* buffer full */
 	utx_buf[0] = 0x04;	/* sysEx start */
 	sysExCnt = 1;
 	return TRUE;		/* send sysEx */
