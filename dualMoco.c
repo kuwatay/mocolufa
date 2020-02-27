@@ -174,7 +174,7 @@ uchar parseSerialMidiMessage(uchar RxByte) {
       return TRUE;		/* send sysEx */
     } else {
       utx_buf[sysExCnt++] = RxByte;
-      if (sysExCnt == 4) {	/* buffer full */
+      if (sysExCnt == (TX_SIZE-1)) {	/* buffer full */
 	utx_buf[0] = 0x04;	/* sysEx start */
 	sysExCnt = 1;
 	return TRUE;		/* send sysEx */
