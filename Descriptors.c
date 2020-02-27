@@ -102,7 +102,7 @@ const USB_Descriptor_Device_t PROGMEM DeviceDescriptorMIDI =
 	.Endpoint0Size          = FIXED_CONTROL_ENDPOINT_SIZE,
 
 	.VendorID               = 0x03EB, // Atmel
-	.ProductID              = 0x2048, // LUFA USB-MIDI Demo application
+	.ProductID              = 0x1800, // CMX800 PID
 	.ReleaseNumber          = 0x0000,
 
 	.ManufacturerStrIndex   = 0x01,
@@ -424,9 +424,9 @@ const USB_Descriptor_String_t PROGMEM ManufacturerStringSerial =
 /* for MIDI */
 const USB_Descriptor_String_t PROGMEM ManufacturerStringMIDI =
 {
-	.Header                 = {.Size = USB_STRING_LEN(17), .Type = DTYPE_String},
+	.Header                 = {.Size = USB_STRING_LEN(10), .Type = DTYPE_String},
 
-	.UnicodeString          = L"kuwatay@nifty.com"
+	.UnicodeString          = L"MWR Design"
 };
 /** Product descriptor string. This is a Unicode string containing the product's details in human readable form,
  *  and is read out upon request by the host when the appropriate string ID is requested, listed in the Device
@@ -453,9 +453,9 @@ const USB_Descriptor_String_t PROGMEM ProductStringSerial =
 /* for MIDI */
 const USB_Descriptor_String_t PROGMEM ProductStringMIDI =
 {
-	.Header                 = {.Size = USB_STRING_LEN(8), .Type = DTYPE_String},
+	.Header                 = {.Size = USB_STRING_LEN(6), .Type = DTYPE_String},
 
-	.UnicodeString          = L"MocoLUFA"
+	.UnicodeString          = L"CMX800"
 };
 
 /** This function is called by the library when in device mode, and must be overridden (see library "USB Descriptors"
