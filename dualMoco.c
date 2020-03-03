@@ -68,7 +68,7 @@ static uchar utxrdy = FALSE;	/* USB Packet ready in utx_buf */
 static uchar rx_buf[RX_SIZE];	/* tempory buffer */
 static uchar utx_buf[RX_SIZE];	/* BULK_IN buffer */
 
-#define    TX_SIZE        (HW_CDC_BULK_OUT_SIZE<<2)
+#define    TX_SIZE        (HW_CDC_BULK_OUT_SIZE<<3)
 #define    TX_MASK        (TX_SIZE-1)
 static uchar uwptr = 0, irptr = 0;
 static uchar tx_buf[TX_SIZE];
@@ -119,16 +119,16 @@ void parseUSBMidiMessage(uchar *data, uchar len) {
       tx_buf[uwptr++] = *(data + i); /* copy to buffer */
       uwptr &= TX_MASK;
       if (i == 1) {
-	if ((cin == 5) || /* single byte system common */
-	    (cin == 15))  /* single byte */
-	  break;
+      	if ((cin == 5) || /* single byte system common */
+      	    (cin == 15))  /* single byte */
+      	  break;
       }
       if (i == 2) {
-	if ((cin == 2) ||  /* two-byte system common */
-	    (cin == 6) ||  /* system ex end with 2 bytes */
-	    (cin == 12) || /* program change */
-	    (cin == 13))   /* channel pressure */
-	  break;
+      	if ((cin == 2) ||  /* two-byte system common */
+      	    (cin == 6) ||  /* system ex end with 2 bytes */
+      	    (cin == 12) || /* program change */
+      	    (cin == 13))   /* channel pressure */
+      	  break;
       }
     }
   }
@@ -174,7 +174,7 @@ uchar parseSerialMidiMessage(uchar RxByte) {
       return TRUE;		/* send sysEx */
     } else {
       utx_buf[sysExCnt++] = RxByte;
-      if (sysExCnt == (TX_SIZE-1)) {	/* buffer full */
+      if (sysExCnt == (RX_SIZE-1)) {	/* buffer full */
 	utx_buf[0] = 0x04;	/* sysEx start */
 	sysExCnt = 1;
 	return TRUE;		/* send sysEx */
