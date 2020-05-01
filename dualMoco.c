@@ -3,7 +3,7 @@
      Copyright (C) 2013 by morecat_lab
 
      2013/09/22
-              
+
      http://morecatlab.akiba.coocan.jp/
 
      based on LUFA-100807
@@ -11,20 +11,20 @@
 /*
              LUFA Library
      Copyright (C) Dean Camera, 2010.
-              
+
   dean [at] fourwalledcubicle [dot] com
       www.fourwalledcubicle.com
 */
 /*
   Copyright 2010  Dean Camera (dean [at] fourwalledcubicle [dot] com)
 
-  Permission to use, copy, modify, distribute, and sell this 
+  Permission to use, copy, modify, distribute, and sell this
   software and its documentation for any purpose is hereby granted
-  without fee, provided that the above copyright notice appear in 
+  without fee, provided that the above copyright notice appear in
   all copies and that both that the copyright notice and this
-  permission notice and warranty disclaimer appear in supporting 
-  documentation, and that the name of the author not be used in 
-  advertising or publicity pertaining to distribution of the 
+  permission notice and warranty disclaimer appear in supporting
+  documentation, and that the name of the author not be used in
+  advertising or publicity pertaining to distribution of the
   software without specific, written prior permission.
 
   The author disclaim all warranties with regard to this
@@ -39,7 +39,7 @@
 
 /** \file
  *
- *  Main source file for the dualMocoLUFA project. 
+ *  Main source file for the dualMocoLUFA project.
  * This file contains the main tasks of the project and is responsible for the initial application hardware configuration.
  */
 
@@ -68,7 +68,7 @@ static uchar utxrdy = FALSE;	/* USB Packet ready in utx_buf */
 static uchar rx_buf[RX_SIZE];	/* tempory buffer */
 static uchar utx_buf[RX_SIZE];	/* BULK_IN buffer */
 
-#define    TX_SIZE        (HW_CDC_BULK_OUT_SIZE<<2)
+#define    TX_SIZE        (HW_CDC_BULK_OUT_SIZE<<3)
 #define    TX_MASK        (TX_SIZE-1)
 static uchar uwptr = 0, irptr = 0;
 static uchar tx_buf[TX_SIZE];
@@ -81,7 +81,7 @@ static uchar tx_buf[TX_SIZE];
 USB_ClassInfo_CDC_Device_t VirtualSerial_CDC_Interface = {
   .Config = {
     .ControlInterfaceNumber         = 0,
-      
+
     .DataINEndpointNumber           = CDC_TX_EPNUM,
     .DataINEndpointSize             = CDC_TXRX_EPSIZE,
     .DataINEndpointDoubleBank       = false,
@@ -89,7 +89,7 @@ USB_ClassInfo_CDC_Device_t VirtualSerial_CDC_Interface = {
     .DataOUTEndpointNumber          = CDC_RX_EPNUM,
     .DataOUTEndpointSize            = CDC_TXRX_EPSIZE,
     .DataOUTEndpointDoubleBank      = false,
-      
+
     .NotificationEndpointNumber     = CDC_NOTIFICATION_EPNUM,
     .NotificationEndpointSize       = CDC_NOTIFICATION_EPSIZE,
     .NotificationEndpointDoubleBank = false,
@@ -99,11 +99,11 @@ USB_ClassInfo_CDC_Device_t VirtualSerial_CDC_Interface = {
 USB_ClassInfo_MIDI_Device_t Keyboard_MIDI_Interface =  {
   .Config = {
     .StreamingInterfaceNumber = 1,
-    
+
     .DataINEndpointNumber      = MIDI_STREAM_IN_EPNUM,
     .DataINEndpointSize        = MIDI_STREAM_EPSIZE,
     .DataINEndpointDoubleBank  = false,
-    
+
     .DataOUTEndpointNumber     = MIDI_STREAM_OUT_EPNUM,
     .DataOUTEndpointSize       = MIDI_STREAM_EPSIZE,
     .DataOUTEndpointDoubleBank = false,
@@ -119,16 +119,16 @@ void parseUSBMidiMessage(uchar *data, uchar len) {
       tx_buf[uwptr++] = *(data + i); /* copy to buffer */
       uwptr &= TX_MASK;
       if (i == 1) {
-	if ((cin == 5) || /* single byte system common */
-	    (cin == 15))  /* single byte */
-	  break;
+      	if ((cin == 5) || /* single byte system common */
+      	    (cin == 15))  /* single byte */
+      	  break;
       }
       if (i == 2) {
-	if ((cin == 2) ||  /* two-byte system common */
-	    (cin == 6) ||  /* system ex end with 2 bytes */
-	    (cin == 12) || /* program change */
-	    (cin == 13))   /* channel pressure */
-	  break;
+      	if ((cin == 2) ||  /* two-byte system common */
+      	    (cin == 6) ||  /* system ex end with 2 bytes */
+      	    (cin == 12) || /* program change */
+      	    (cin == 13))   /* channel pressure */
+      	  break;
       }
     }
   }
@@ -158,7 +158,11 @@ uchar parseSerialMidiMessage(uchar RxByte) {
     12 | 0x80,			/* 12->12 Channel Pressure (2) */
     0,				/* 13 dummy */
     15,				/* 14->15 Pitch Bend (3) */
-    14 | 0x80			/* 15->14 */
+    14 | 0x80,			/* 15->14 */
+    16 | 0x80,      /* 16->16 System Common: MTC Quarter frame, Song select, Tune request (2) */
+    0,                 /* dummy */
+    19,				/* 18-> 19 System Common: Song position pointer (3) */
+    18 | 0x80			/* 19->18 */
   };
 
   if(SysEx){  /* MIDI System Message */
@@ -170,7 +174,7 @@ uchar parseSerialMidiMessage(uchar RxByte) {
       return TRUE;		/* send sysEx */
     } else {
       utx_buf[sysExCnt++] = RxByte;
-      if (sysExCnt == 4) {	/* buffer full */
+      if (sysExCnt == (RX_SIZE-1)) {	/* buffer full */
 	utx_buf[0] = 0x04;	/* sysEx start */
 	sysExCnt = 1;
 	return TRUE;		/* send sysEx */
@@ -197,16 +201,30 @@ uchar parseSerialMidiMessage(uchar RxByte) {
   }
 
   if (PC == 0) {
-    PC = (((RxByte >> 4) & 0x07) + 1) * 2;
+    if (RxByte == 0xf2)	{
+		PC = 18;	// special case for 2-byte song position pointer (SPP) system common
+	} else {
+    	PC = (((RxByte >> 4) & 0x07) + 1) * 2;
+	}
     // conversion
     // 0x80 -> 2, 0x90 -> 4, 0xa0 -> 6, 0xb0 -> 8, 0xc0 -> 10, 0xd0 -> 12, 0xe0 -> 14
-    rx_buf[0] = RxByte >> 4;
+    // 0xF1 -> 16, 0xF3 -> 16, 0xF6 -> 16, 0xF2 -> 18
+
+	// set event code index number (CIN) from Table 4-1
+	// https://usb.org/sites/default/files/midi10.pdf
+    if (RxByte == 0xf2) {
+		rx_buf[0] = 3;				// 3 byte system common
+	} else if ((RxByte & 0xf0) == 0xf0) {
+		rx_buf[0] = 2;				// 2 byte system common
+	} else {
+	    rx_buf[0] = RxByte >> 4;	// set event code for the rest 8 - F.
+	}
     rx_buf[1] = RxByte;
     rx_buf[3] = 0;
   } else {
     uchar tt = stateTransTable[PC];
-    rx_buf[(PC & 1) + 2] = RxByte;
-    PC = tt & 0x0f;
+    rx_buf[(PC & 1) + 2] = RxByte;	// byte 2 or 3
+    PC = tt & 0x7f;
     if ((tt & 0x80) != 0) {
       memcpy(utx_buf, rx_buf, 4);
       return TRUE;
@@ -258,19 +276,19 @@ void processMIDI() {
       LEDs_TurnOnLEDs(LEDMASK_RX);
       PulseMSRemaining.RxLEDPulse = TX_RX_LED_PULSE_MS;
     }
-      
+
     /* send to Serial MIDI line  */
     if( (UCSR1A & (1<<UDRE1)) && uwptr!=irptr ) {
       UDR1 = tx_buf[irptr++];
       irptr &= TX_MASK;
     }
-    
+
     if (TIFR0 & (1 << TOV0)) {
       TIFR0 |= (1 << TOV0);
       /* Turn off TX LED(s) once the TX pulse period has elapsed */
       if (PulseMSRemaining.TxLEDPulse && !(--PulseMSRemaining.TxLEDPulse))
 	LEDs_TurnOffLEDs(LEDMASK_TX);
-      
+
       /* Turn off RX LED(s) once the RX pulse period has elapsed */
       if (PulseMSRemaining.RxLEDPulse && !(--PulseMSRemaining.RxLEDPulse))
 	LEDs_TurnOffLEDs(LEDMASK_RX);
@@ -291,7 +309,7 @@ void processMIDI() {
 
 
 void processSerial(void) {
-	
+
   RingBuffer_InitBuffer(&USBtoUSART_Buffer);
   RingBuffer_InitBuffer(&USARTtoUSB_Buffer);
 
@@ -303,44 +321,44 @@ void processSerial(void) {
       if (!(RingBuffer_IsFull(&USBtoUSART_Buffer)))
 	{
 	  int16_t ReceivedByte = CDC_Device_ReceiveByte(&VirtualSerial_CDC_Interface);
-	  
+
 	  /* Read bytes from the USB OUT endpoint into the USART transmit buffer */
 	  if (!(ReceivedByte < 0))
 	    RingBuffer_Insert(&USBtoUSART_Buffer, ReceivedByte);
 	}
-      
+
       /* Check if the UART receive buffer flush timer has expired or the buffer is nearly full */
       RingBuff_Count_t BufferCount = RingBuffer_GetCount(&USARTtoUSB_Buffer);
       if ((TIFR0 & (1 << TOV0)) || (BufferCount > BUFFER_NEARLY_FULL))
 	{
 	  TIFR0 |= (1 << TOV0);
-	  
+
 	  if (USARTtoUSB_Buffer.Count) {
 	    LEDs_TurnOnLEDs(LEDMASK_TX);
 	    PulseMSRemaining.TxLEDPulse = TX_RX_LED_PULSE_MS;
 	  }
-	  
+
 	  /* Read bytes from the USART receive buffer into the USB IN endpoint */
 	  while (BufferCount--)
 	    CDC_Device_SendByte(&VirtualSerial_CDC_Interface, RingBuffer_Remove(&USARTtoUSB_Buffer));
-	  
+
 	  /* Turn off TX LED(s) once the TX pulse period has elapsed */
 	  if (PulseMSRemaining.TxLEDPulse && !(--PulseMSRemaining.TxLEDPulse))
 	    LEDs_TurnOffLEDs(LEDMASK_TX);
-	  
+
 	  /* Turn off RX LED(s) once the RX pulse period has elapsed */
 	  if (PulseMSRemaining.RxLEDPulse && !(--PulseMSRemaining.RxLEDPulse))
 	    LEDs_TurnOffLEDs(LEDMASK_RX);
 	}
-      
+
       /* Load the next byte from the USART transmit buffer into the USART */
       if (!(RingBuffer_IsEmpty(&USBtoUSART_Buffer))) {
 	Serial_TxByte(RingBuffer_Remove(&USBtoUSART_Buffer));
-	
+
 	LEDs_TurnOnLEDs(LEDMASK_RX);
 	PulseMSRemaining.RxLEDPulse = TX_RX_LED_PULSE_MS;
       }
-		
+
       CDC_Device_USBTask(&VirtualSerial_CDC_Interface);
       USB_USBTask();
     }
@@ -375,7 +393,7 @@ void SetupHardware(void) {
 
   /* Start the flush timer so that overflows occur rapidly to push received bytes to the USB interface */
   TCCR0B = (1 << CS02);
-  
+
   /* Hardware Initialization */
   USB_Init();
   LEDs_Init();
@@ -431,16 +449,16 @@ void EVENT_CDC_Device_LineEncodingChanged(USB_ClassInfo_CDC_Device_t* const CDCI
   switch (CDCInterfaceInfo->State.LineEncoding.ParityType)
     {
     case CDC_PARITY_Odd:
-      ConfigMask = ((1 << UPM11) | (1 << UPM10));		
+      ConfigMask = ((1 << UPM11) | (1 << UPM10));
       break;
     case CDC_PARITY_Even:
-      ConfigMask = (1 << UPM11);		
+      ConfigMask = (1 << UPM11);
       break;
     }
-  
+
   if (CDCInterfaceInfo->State.LineEncoding.CharFormat == CDC_LINEENCODING_TwoStopBits)
     ConfigMask |= (1 << USBS1);
-  
+
   switch (CDCInterfaceInfo->State.LineEncoding.DataBits)
     {
     case 6:
@@ -459,10 +477,10 @@ void EVENT_CDC_Device_LineEncodingChanged(USB_ClassInfo_CDC_Device_t* const CDCI
   UCSR1A = 0;
   UCSR1C = 0;
 
-  /* Special case 57600 baud for compatibility with the ATmega328 bootloader. */	
+  /* Special case 57600 baud for compatibility with the ATmega328 bootloader. */
   UBRR1  = (CDCInterfaceInfo->State.LineEncoding.BaudRateBPS == 57600)
     ? SERIAL_UBBRVAL(CDCInterfaceInfo->State.LineEncoding.BaudRateBPS)
-    : SERIAL_2X_UBBRVAL(CDCInterfaceInfo->State.LineEncoding.BaudRateBPS);	
+    : SERIAL_2X_UBBRVAL(CDCInterfaceInfo->State.LineEncoding.BaudRateBPS);
 
   UCSR1C = ConfigMask;
   UCSR1A = (CDCInterfaceInfo->State.LineEncoding.BaudRateBPS == 57600) ? 0 : (1 << U2X1);
@@ -487,7 +505,7 @@ ISR(USART1_RX_vect, ISR_BLOCK) {
  */
 void EVENT_CDC_Device_ControLineStateChanged(USB_ClassInfo_CDC_Device_t* const CDCInterfaceInfo) {
   bool CurrentDTRState = (CDCInterfaceInfo->State.ControlLineStates.HostToDevice & CDC_CONTROL_LINE_OUT_DTR);
-	
+
   if (CurrentDTRState)
     AVR_RESET_LINE_PORT &= ~AVR_RESET_LINE_MASK;
   else
