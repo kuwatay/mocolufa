@@ -141,6 +141,7 @@ void parseUSBMidiMessage(uchar *data, uchar len) {
 uchar parseSerialMidiMessage(uchar RxByte) {
   static uchar PC = 0;
   static uchar SysEx = FALSE;
+  static uchar sysCom = FALSE;
   static uchar sysExCnt = 0;
   static uchar stateTransTable[] = {
     0, 				/* 0 dummy */
@@ -161,6 +162,12 @@ uchar parseSerialMidiMessage(uchar RxByte) {
     14 | 0x80			/* 15->14 */
   };
 
+  if(sysCom) { /* MIDI System Common */
+  	sysCom=FALSE;
+	  utx_buf[1]=RxByte;
+	  return TRUE;
+  }
+
   if(SysEx){  /* MIDI System Message */
     if(RxByte == 0xf7){		/* MIDI_EndSysEx */
       utx_buf[sysExCnt++] = RxByte;
@@ -171,9 +178,9 @@ uchar parseSerialMidiMessage(uchar RxByte) {
     } else {
       utx_buf[sysExCnt++] = RxByte;
       if (sysExCnt == 4) {	/* buffer full */
-	utx_buf[0] = 0x04;	/* sysEx start */
-	sysExCnt = 1;
-	return TRUE;		/* send sysEx */
+	      utx_buf[0] = 0x04;	/* sysEx start */
+	      sysExCnt = 1;
+	      return TRUE;		/* send sysEx */
       }
     }
     return FALSE;
@@ -186,6 +193,15 @@ uchar parseSerialMidiMessage(uchar RxByte) {
     return TRUE;
   }
 
+	if(RxByte == 0xf1){ /* MTC */
+	  sysCom = TRUE;
+	  utx_buf[0]=0xf1;
+	  utx_buf[1]=0x0;
+	  utx_buf[2]=0x0;
+	  utx_buf[3]=0x0;
+	  return FALSE;
+	}
+  
   if(RxByte > 0x7f){		/* Channel message */
     if(RxByte == 0xf0){		/* MIDI_StartSysEx */
       SysEx = TRUE;
